@@ -147,5 +147,28 @@ assert "Forgejo /api/healthz responds 200" \
 assert "Forgejo HTML home page reachable" \
   bash -c "curl -fsS http://localhost:$HTTP_PORT/ | grep -q 'Forgejo'"
 
+echo ">>> waiting up to 90s for first backup dump (cron is */1 in test config)"
+elapsed=0
+backup_count=0
+until [[ "$backup_count" -gt 0 ]]; do
+  sleep 5
+  elapsed=$((elapsed + 5))
+  backup_count=$(find "$DATA_DIR/backups" -name 'forgejo-*.sql.gz' 2>/dev/null | wc -l)
+  if [[ $elapsed -ge 90 ]]; then
+    echo "  Timeout waiting for backup dump"
+    docker logs "$CONTAINER" | tail -50
+    ls -la "$DATA_DIR/backups" || true
+    exit 1
+  fi
+done
+assert "at least one backup dump was created" test "$backup_count" -gt 0
+
+echo ">>> validating dump is a valid gzip + sql"
+DUMP_FILE=$(find "$DATA_DIR/backups" -name 'forgejo-*.sql.gz' | head -1)
+assert "dump file is non-empty" test -s "$DUMP_FILE"
+assert "dump is valid gzip" gzip -t "$DUMP_FILE"
+assert "dump contains forgejo schema" \
+  bash -c "gunzip -c '$DUMP_FILE' | head -20 | grep -q 'PostgreSQL database dump'"
+
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"
