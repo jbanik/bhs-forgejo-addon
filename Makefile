@@ -4,9 +4,9 @@ ARCH ?= amd64
 IMAGE ?= bhs/forgejo-addon-test:$(ARCH)
 
 lint:
-	@command -v hadolint >/dev/null && hadolint forgejo/Dockerfile || echo "hadolint not installed, skipping"
-	@command -v shellcheck >/dev/null && shellcheck $$(find forgejo/rootfs tests -name '*.sh' -o -name 'run' -o -name 'up') || echo "shellcheck not installed, skipping"
-	@command -v yamllint >/dev/null && yamllint forgejo/ repository.yaml || echo "yamllint not installed, skipping"
+	@if command -v hadolint >/dev/null; then hadolint forgejo/Dockerfile; else echo "hadolint not installed, skipping"; fi
+	@if command -v shellcheck >/dev/null; then shellcheck $$(find forgejo/rootfs tests \( -name '*.sh' -o -name 'run' -o -name 'up' \) -type f); else echo "shellcheck not installed, skipping"; fi
+	@if command -v yamllint >/dev/null; then yamllint forgejo/ repository.yaml; else echo "yamllint not installed, skipping"; fi
 
 build:
 	docker build \

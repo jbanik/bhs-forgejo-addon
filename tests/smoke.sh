@@ -66,8 +66,8 @@ docker run -d \
 
 echo ">>> waiting up to 60s for container to be running"
 sleep 5
-assert "container is running" \
-  bash -c '[[ "$(docker inspect -f "{{.State.Running}}" forgejo-smoke)" == "true" ]]'
+running=$(docker inspect -f '{{.State.Running}}' "$CONTAINER")
+assert "container is running" test "$running" = "true"
 
 echo ">>> SMOKE: basic startup assertions only (more added in later tasks)"
 echo "ALL ASSERTIONS PASSED"
