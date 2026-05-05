@@ -1,0 +1,13 @@
+# Build artifacts
+*.tmp
+*.bak
+.DS_Store
+
+# Local test data
+test-data/
+.smoke-cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
