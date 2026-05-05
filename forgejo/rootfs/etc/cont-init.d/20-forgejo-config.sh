@@ -1,0 +1,147 @@
+#!/usr/bin/env bashio
+# shellcheck shell=bash
+# Generate /data/forgejo/conf/app.ini from HA add-on options on every container start.
+
+set -euo pipefail
+
+CONF_DIR=/data/forgejo/conf
+CONF_FILE=$CONF_DIR/app.ini
+PASSWORD_FILE=/data/.db_password
+OPTIONS_FILE=/data/options.json
+
+mkdir -p "$CONF_DIR"
+
+# Read a config value via bashio first (real HA), then fall back to reading
+# /data/options.json directly with jq. The fallback covers smoke tests and
+# any environment where the supervisor API isn't reachable.
+get_option() {
+  local key="$1"
+  local value
+  value=$(bashio::config "$key" 2>/dev/null || true)
+  if [[ -z "$value" || "$value" == "null" ]] && [[ -f "$OPTIONS_FILE" ]]; then
+    value=$(jq -r --arg k "$key" '.[$k] // empty' "$OPTIONS_FILE")
+  fi
+  echo "$value"
+}
+
+HTTP_PORT=$(get_option 'http_port')
+ROOT_URL=$(get_option 'root_url')
+SITE_NAME=$(get_option 'site_name')
+DISABLE_REGISTRATION=$(get_option 'disable_registration')
+REQUIRE_SIGNIN_VIEW=$(get_option 'require_signin_view')
+LOG_LEVEL=$(get_option 'log_level')
+
+DB_PASSWORD=$(cat "$PASSWORD_FILE")
+
+# Derive DOMAIN from ROOT_URL (strip scheme + path, keep host[:port])
+DOMAIN=$(echo "$ROOT_URL" | sed -E 's#^https?://##; s#/.*##; s#:.*##')
+
+bashio::log.info "Generating Forgejo config: ROOT_URL=$ROOT_URL, DOMAIN=$DOMAIN, HTTP_PORT=$HTTP_PORT"
+
+cat > "$CONF_FILE" <<EOF
+APP_NAME = $SITE_NAME
+RUN_USER = git
+RUN_MODE = prod
+WORK_PATH = /data/forgejo
+
+[server]
+PROTOCOL = http
+HTTP_ADDR = 0.0.0.0
+HTTP_PORT = 3000
+DOMAIN = $DOMAIN
+ROOT_URL = $ROOT_URL
+DISABLE_SSH = true
+START_SSH_SERVER = false
+LFS_START_SERVER = true
+LFS_JWT_SECRET = $(head -c 32 /dev/urandom | base64 | tr -d '+/=\n' | head -c 43)
+APP_DATA_PATH = /data/forgejo
+OFFLINE_MODE = false
+
+[database]
+DB_TYPE = postgres
+HOST = 127.0.0.1:5432
+NAME = forgejo
+USER = forgejo
+PASSWD = $DB_PASSWORD
+SSL_MODE = disable
+LOG_SQL = false
+
+[repository]
+ROOT = /data/forgejo/repos
+
+[security]
+INSTALL_LOCK = false
+SECRET_KEY = $(head -c 32 /dev/urandom | base64 | tr -d '+/=\n' | head -c 43)
+INTERNAL_TOKEN = $(head -c 64 /dev/urandom | base64 | tr -d '+/=\n' | head -c 105)
+PASSWORD_HASH_ALGO = pbkdf2_hi
+
+[oauth2]
+JWT_SECRET = $(head -c 32 /dev/urandom | base64 | tr -d '+/=\n' | head -c 43)
+
+[service]
+DISABLE_REGISTRATION = $DISABLE_REGISTRATION
+REQUIRE_SIGNIN_VIEW = $REQUIRE_SIGNIN_VIEW
+DEFAULT_KEEP_EMAIL_PRIVATE = true
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+ENABLE_NOTIFY_MAIL = false
+
+[session]
+PROVIDER = file
+PROVIDER_CONFIG = /data/forgejo/sessions
+
+[picture]
+AVATAR_UPLOAD_PATH = /data/forgejo/avatars
+REPOSITORY_AVATAR_UPLOAD_PATH = /data/forgejo/repo-avatars
+
+[attachment]
+PATH = /data/forgejo/attachments
+
+[log]
+ROOT_PATH = /data/forgejo/log
+MODE = console
+LEVEL = $LOG_LEVEL
+
+[lfs]
+PATH = /data/forgejo/lfs
+
+[indexer]
+ISSUE_INDEXER_PATH = /data/forgejo/indexers/issues.bleve
+REPO_INDEXER_ENABLED = true
+REPO_INDEXER_PATH = /data/forgejo/indexers/repos.bleve
+
+[mailer]
+ENABLED = false
+
+[other]
+SHOW_FOOTER_VERSION = false
+SHOW_FOOTER_TEMPLATE_LOAD_TIME = false
+EOF
+
+# IMPORTANT: regenerating SECRET_KEY/INTERNAL_TOKEN/JWT_SECRET on every start would
+# invalidate sessions and 2FA tokens. So: only generate on first run, then stash a copy.
+SECRETS_CACHE=/data/forgejo/conf/.secrets
+if [[ -f "$SECRETS_CACHE" ]]; then
+  bashio::log.info "Restoring cached Forgejo secrets..."
+  # shellcheck disable=SC1090
+  source "$SECRETS_CACHE"
+  sed -i \
+    -e "s|^SECRET_KEY = .*|SECRET_KEY = $SECRET_KEY|" \
+    -e "s|^INTERNAL_TOKEN = .*|INTERNAL_TOKEN = $INTERNAL_TOKEN|" \
+    -e "s|^JWT_SECRET = .*|JWT_SECRET = $JWT_SECRET|" \
+    -e "s|^LFS_JWT_SECRET = .*|LFS_JWT_SECRET = $LFS_JWT_SECRET|" \
+    "$CONF_FILE"
+else
+  bashio::log.info "Caching newly generated Forgejo secrets to $SECRETS_CACHE..."
+  {
+    echo "SECRET_KEY=$(grep -E '^SECRET_KEY ' "$CONF_FILE" | awk '{print $3}')"
+    echo "INTERNAL_TOKEN=$(grep -E '^INTERNAL_TOKEN ' "$CONF_FILE" | awk '{print $3}')"
+    echo "JWT_SECRET=$(grep -E '^JWT_SECRET ' "$CONF_FILE" | awk '{print $3}')"
+    echo "LFS_JWT_SECRET=$(grep -E '^LFS_JWT_SECRET ' "$CONF_FILE" | awk '{print $3}')"
+  } > "$SECRETS_CACHE"
+  chmod 600 "$SECRETS_CACHE"
+fi
+
+chown -R git:git /data/forgejo/conf
+chmod 0640 "$CONF_FILE"
+
+bashio::log.info "Forgejo config written to $CONF_FILE."

@@ -117,5 +117,28 @@ until docker exec "$CONTAINER" su-exec postgres pg_isready -h /tmp -q 2>/dev/nul
 done
 assert "postgres accepts local connections" docker exec "$CONTAINER" su-exec postgres pg_isready -h /tmp -q
 
+echo ">>> waiting up to 30s for app.ini to appear on host bind mount"
+elapsed=0
+until [[ -f "$DATA_DIR/forgejo/conf/app.ini" ]]; do
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if [[ $elapsed -ge 30 ]]; then
+    echo "  Timeout waiting for app.ini"
+    docker logs "$CONTAINER" | tail -50
+    exit 1
+  fi
+done
+
+echo ">>> verifying app.ini generation"
+assert "app.ini exists" test -f "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini contains correct ROOT_URL" \
+  grep -q "^ROOT_URL = http://localhost:13000/" "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini configures postgres DB" \
+  grep -q "^DB_TYPE = postgres" "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini sets DISABLE_REGISTRATION = true" \
+  grep -q "^DISABLE_REGISTRATION = true" "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini starts with INSTALL_LOCK = false (first boot)" \
+  grep -q "^INSTALL_LOCK = false" "$DATA_DIR/forgejo/conf/app.ini"
+
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"
