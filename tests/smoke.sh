@@ -170,5 +170,17 @@ assert "dump is valid gzip" gzip -t "$DUMP_FILE"
 assert "dump contains forgejo schema" \
   bash -c "gunzip -c '$DUMP_FILE' | head -20 | grep -q 'PostgreSQL database dump'"
 
+echo ">>> stopping and restarting container to verify data persistence"
+docker stop "$CONTAINER" >/dev/null
+docker start "$CONTAINER" >/dev/null
+
+echo ">>> waiting up to 60s for Forgejo to come back up"
+wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 60
+assert "Forgejo healthz responds 200 after restart" \
+  bash -c "[[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT/api/healthz)\" == \"200\" ]]"
+assert "DB password file persisted" test -f "$DATA_DIR/.db_password"
+assert "Postgres data dir persisted" test -f "$DATA_DIR/postgres/PG_VERSION"
+assert "Forgejo secrets cache persisted" test -f "$DATA_DIR/forgejo/conf/.secrets"
+
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"
