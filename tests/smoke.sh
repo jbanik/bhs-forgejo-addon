@@ -140,5 +140,12 @@ assert "app.ini sets DISABLE_REGISTRATION = true" \
 assert "app.ini starts with INSTALL_LOCK = false (first boot)" \
   grep -q "^INSTALL_LOCK = false" "$DATA_DIR/forgejo/conf/app.ini"
 
+echo ">>> waiting up to 90s for Forgejo HTTP healthz"
+wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 90
+assert "Forgejo /api/healthz responds 200" \
+  bash -c "[[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT/api/healthz)\" == \"200\" ]]"
+assert "Forgejo HTML home page reachable" \
+  bash -c "curl -fsS http://localhost:$HTTP_PORT/ | grep -q 'Forgejo'"
+
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"
