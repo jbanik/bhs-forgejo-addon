@@ -6,8 +6,23 @@ set -euo pipefail
 
 IMAGE="${1:-bhs/forgejo-addon-test:amd64}"
 CONTAINER="forgejo-smoke"
-DATA_DIR="$(pwd)/test-data"
 HTTP_PORT="${HTTP_PORT:-13000}"
+
+# DATA_DIR must be a path Docker Desktop can bind-mount AND that this shell
+# can read back. On Linux/macOS, the POSIX path works for both. On Windows
+# Git Bash / MSYS2, Docker Desktop needs a Windows-style path (C:/...) and
+# MSYS will rewrite Unix-looking arguments unless we disable it.
+HOST_DATA_DIR="$(pwd)/test-data"
+case "${OSTYPE:-}" in
+  msys*|cygwin*)
+    # Use Windows-style path so Docker Desktop's bind mount points to the
+    # actual Windows directory the shell can also read from. Also disable
+    # MSYS path conversion so "/data" stays "/data" inside docker args.
+    HOST_DATA_DIR="$(pwd -W)/test-data"
+    export MSYS_NO_PATHCONV=1
+    ;;
+esac
+DATA_DIR="$HOST_DATA_DIR"
 
 cleanup() {
   echo ">>> cleanup"
@@ -69,5 +84,38 @@ sleep 5
 running=$(docker inspect -f '{{.State.Running}}' "$CONTAINER")
 assert "container is running" test "$running" = "true"
 
-echo ">>> SMOKE: basic startup assertions only (more added in later tasks)"
+echo ">>> waiting up to 60s for postgres to initialize"
+elapsed=0
+until [[ -f "$DATA_DIR/postgres/PG_VERSION" ]]; do
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if [[ $elapsed -ge 60 ]]; then
+    echo "  Timeout waiting for postgres init"
+    docker logs "$CONTAINER" | tail -50
+    exit 1
+  fi
+done
+assert "postgres data directory is initialized" test -f "$DATA_DIR/postgres/PG_VERSION"
+assert "postgres password file is created" test -f "$DATA_DIR/.db_password"
+# NOTE: Check perms inside the container, not on the host bind mount.
+# Docker Desktop on Windows/macOS doesn't preserve POSIX modes through its
+# filesharing layer, so a host-side stat returns the wrong value even though
+# inside the container the file is correctly chmod 600.
+assert "postgres password file is mode 600" \
+  bash -c "[[ \"\$(docker exec '$CONTAINER' stat -c %a /data/.db_password)\" == \"600\" ]]"
+
+echo ">>> waiting up to 30s for postgres to accept connections"
+elapsed=0
+until docker exec "$CONTAINER" su-exec postgres pg_isready -h /tmp -q 2>/dev/null; do
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if [[ $elapsed -ge 30 ]]; then
+    echo "  postgres not accepting connections"
+    docker logs "$CONTAINER" | tail -50
+    exit 1
+  fi
+done
+assert "postgres accepts local connections" docker exec "$CONTAINER" su-exec postgres pg_isready -h /tmp -q
+
+echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"

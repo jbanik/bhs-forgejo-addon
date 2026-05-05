@@ -1,0 +1,11 @@
+# Force LF line endings for files that run inside Linux containers.
+# Without this, Windows clones with core.autocrlf=true will rewrite LF -> CRLF
+# in the working tree, which then gets COPYed into the docker image and
+# breaks shell scripts and s6 service definitions at runtime.
+*.sh             text eol=lf
+forgejo/rootfs/** text eol=lf
+tests/**         text eol=lf
+Dockerfile       text eol=lf
+*.yaml           text eol=lf
+*.yml            text eol=lf
+*.json           text eol=lf
