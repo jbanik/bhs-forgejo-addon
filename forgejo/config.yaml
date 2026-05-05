@@ -1,5 +1,5 @@
 name: Forgejo
-version: "0.1.0"
+version: "0.1.1"
 slug: forgejo
 description: Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled DB backups.
 url: "https://github.com/jbanik/bhs-forgejo-addon"
