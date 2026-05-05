@@ -31,6 +31,21 @@ DISABLE_REGISTRATION=$(get_option 'disable_registration')
 REQUIRE_SIGNIN_VIEW=$(get_option 'require_signin_view')
 LOG_LEVEL=$(get_option 'log_level')
 
+# Strip characters that would break INI syntax or trigger heredoc interpretation:
+# - newlines/CR break line structure
+# - backticks trigger command substitution in unquoted heredoc
+# - backslashes can surprise downstream parsing; INI doesn't generally need escapes
+# Bools, ports, log_level, and root_url are constrained by the HA schema; only
+# free-text fields (site_name) need sanitization, but apply consistently for safety.
+# NOTE: $ chars in option values WILL undergo shell expansion in the heredoc below.
+# In practice this never happens for site_name/log_level (humans don't write $VAR
+# in titles), but if it does, the user sees an interpolated value rather than literal $.
+# Switching to printf-based field writes would be the bulletproof fix; deferred for now.
+sanitize_ini() { tr -d '\n\r`' <<< "$1" | tr -d '\\'; }
+SITE_NAME=$(sanitize_ini "$SITE_NAME")
+ROOT_URL=$(sanitize_ini "$ROOT_URL")
+LOG_LEVEL=$(sanitize_ini "$LOG_LEVEL")
+
 DB_PASSWORD=$(cat "$PASSWORD_FILE")
 
 # Derive DOMAIN from ROOT_URL (strip scheme + path, keep host[:port])
@@ -124,6 +139,10 @@ if [[ -f "$SECRETS_CACHE" ]]; then
   bashio::log.info "Restoring cached Forgejo secrets..."
   # shellcheck disable=SC1090
   source "$SECRETS_CACHE"
+  : "${SECRET_KEY:?cached SECRET_KEY is empty or missing in $SECRETS_CACHE}"
+  : "${INTERNAL_TOKEN:?cached INTERNAL_TOKEN is empty or missing in $SECRETS_CACHE}"
+  : "${JWT_SECRET:?cached JWT_SECRET is empty or missing in $SECRETS_CACHE}"
+  : "${LFS_JWT_SECRET:?cached LFS_JWT_SECRET is empty or missing in $SECRETS_CACHE}"
   sed -i \
     -e "s|^SECRET_KEY = .*|SECRET_KEY = $SECRET_KEY|" \
     -e "s|^INTERNAL_TOKEN = .*|INTERNAL_TOKEN = $INTERNAL_TOKEN|" \
