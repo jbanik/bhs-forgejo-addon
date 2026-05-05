@@ -29,7 +29,7 @@ RUN set -eux; \
     case "$arch" in \
       amd64|x86_64)   forgejo_arch=amd64 ;; \
       arm64|aarch64)  forgejo_arch=arm64 ;; \
-      arm/v7|armv7l)  forgejo_arch=arm-6 ;; \
+      arm|arm/v7|armv7l)  forgejo_arch=arm-6 ;; \
       *) echo "unsupported arch: $arch"; exit 1 ;; \
     esac; \
     curl -fsSL -o /usr/local/bin/forgejo \

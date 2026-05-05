@@ -41,6 +41,7 @@ LOG_LEVEL=$(get_option 'log_level')
 # In practice this never happens for site_name/log_level (humans don't write $VAR
 # in titles), but if it does, the user sees an interpolated value rather than literal $.
 # Switching to printf-based field writes would be the bulletproof fix; deferred for now.
+# shellcheck disable=SC1003
 sanitize_ini() { tr -d '\n\r`' <<< "$1" | tr -d '\\'; }
 SITE_NAME=$(sanitize_ini "$SITE_NAME")
 ROOT_URL=$(sanitize_ini "$ROOT_URL")

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 - 2026-05-06
+
+- Fix CI build for armv7: HA builder passes TARGETARCH=arm (not arm/v7), now matched in the Dockerfile case statement.
+- Fix CI lint: exclude execlineb-shebanged s6 service files from ShellCheck (they are not shell scripts), quiet SC1003 false positive in app.ini sanitizer, and quote HTTP_PORT in smoke test curl URLs.
+
 ## 0.1.1 - 2026-05-06
 
 - Fix CI lint: silence hadolint DL3006 by pinning a default BUILD_FROM.

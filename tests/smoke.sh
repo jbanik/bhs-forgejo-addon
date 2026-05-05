@@ -142,6 +142,7 @@ assert "app.ini starts with INSTALL_LOCK = false (first boot)" \
 
 echo ">>> waiting up to 90s for Forgejo HTTP healthz"
 wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 90
+# shellcheck disable=SC2086
 assert "Forgejo /api/healthz responds 200" \
   bash -c "[[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT/api/healthz)\" == \"200\" ]]"
 assert "Forgejo HTML home page reachable" \
@@ -176,6 +177,7 @@ docker start "$CONTAINER" >/dev/null
 
 echo ">>> waiting up to 60s for Forgejo to come back up"
 wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 60
+# shellcheck disable=SC2086
 assert "Forgejo healthz responds 200 after restart" \
   bash -c "[[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT/api/healthz)\" == \"200\" ]]"
 assert "DB password file persisted" test -f "$DATA_DIR/.db_password"

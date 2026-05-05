@@ -21,6 +21,7 @@ jobs:
         with:
           scandir: ./forgejo/rootfs
           additional_files: tests/smoke.sh
+          ignore_paths: forgejo/rootfs/etc/s6-overlay
 
       - name: Yamllint
         uses: ibiqlik/action-yamllint@v3
