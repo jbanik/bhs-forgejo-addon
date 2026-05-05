@@ -1,0 +1,41 @@
+name: Forgejo
+version: "0.1.0"
+slug: forgejo
+description: Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled DB backups.
+url: "https://github.com/jbanik/bhs-forgejo-addon"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: application
+boot: auto
+host_network: false
+hassio_api: false
+hassio_role: default
+homeassistant_api: false
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: Forgejo HTTP
+map:
+  - addon_config:rw
+options:
+  http_port: 3000
+  root_url: "https://git.banik-haustechnik-schwabach.de/"
+  site_name: "Forgejo"
+  disable_registration: true
+  require_signin_view: false
+  log_level: "Info"
+  backup_cron: "0 3 * * *"
+  backup_retention_days: 7
+schema:
+  http_port: port
+  root_url: url
+  site_name: str
+  disable_registration: bool
+  require_signin_view: bool
+  log_level: list(Trace|Debug|Info|Warn|Error|Critical|Fatal)
+  backup_cron: "match(^([0-9*,/-]+\\s+){4}[0-9*,/-]+$)"
+  backup_retention_days: int(1,365)
+image: "ghcr.io/jbanik/{arch}-addon-forgejo"

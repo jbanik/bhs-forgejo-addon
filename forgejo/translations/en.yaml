@@ -1,0 +1,25 @@
+configuration:
+  http_port:
+    name: HTTP port
+    description: Host port mapped to Forgejo's internal port 3000.
+  root_url:
+    name: Root URL
+    description: External URL Forgejo should advertise (e.g. https://git.example.com/). Must end with a slash.
+  site_name:
+    name: Site name
+    description: Name shown in the Forgejo UI header.
+  disable_registration:
+    name: Disable self-registration
+    description: When true, only admins can create users.
+  require_signin_view:
+    name: Require sign-in to view
+    description: When true, anonymous users cannot browse repositories.
+  log_level:
+    name: Log level
+    description: Forgejo log verbosity.
+  backup_cron:
+    name: Backup cron schedule
+    description: Standard cron expression (5 fields). Default is daily at 03:00.
+  backup_retention_days:
+    name: Backup retention (days)
+    description: How many days to keep .sql.gz dumps in /data/backups.
