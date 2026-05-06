@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dumps the forgejo database to /data/backups/ and prunes old dumps.
+# Dumps the forgejo database to /config/backups/ and prunes old dumps.
 # Reads retention from /data/options.json (HA writes this) — falls back to 7 days.
 
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 # so jq, su-exec, pg_dump, gzip, find, date, stat are reachable.
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-BACKUP_DIR=/data/backups
+BACKUP_DIR=/config/backups
 RETENTION_DAYS=$(jq -r '.backup_retention_days // 7' /data/options.json 2>/dev/null || echo 7)
 
 mkdir -p "$BACKUP_DIR"

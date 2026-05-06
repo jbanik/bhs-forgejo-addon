@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - 2026-05-06
+
+- Move database backups to `/config/backups/` so they're visible in HA's File Editor / Samba (under `addon_configs/<slug>/backups/`).
+- Add app.ini override mechanism: drop a file at `/config/forgejo/app.ini.override` to add or override any Forgejo setting that the add-on UI doesn't expose. Last-key-wins semantics; safe to use for any non-database, non-secret setting.
+- Snapshot of HA-generated config available read-only at `/config/forgejo/app.ini.generated` for inspection.
+
 ## 0.2.0 - 2026-05-06
 
 - Remove redundant `http_port` add-on option (Home Assistant's Network UI controls the host-side port; the option was never wired into Forgejo's app.ini).

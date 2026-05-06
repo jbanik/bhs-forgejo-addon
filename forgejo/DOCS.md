@@ -34,15 +34,15 @@ Restart Home Assistant. A "Forgejo" item appears in the sidebar.
 
 ## Backups
 
-The add-on writes a `pg_dump` to `/data/backups/forgejo-YYYY-MM-DD_HH-MM.sql.gz` according to the `backup_cron` schedule. Files older than `backup_retention_days` are deleted automatically.
+The add-on writes a `pg_dump` to `/addon_configs/<slug>/backups/forgejo-YYYY-MM-DD_HH-MM.sql.gz` according to the `backup_cron` schedule. The directory is visible in the **File Editor** add-on (under `addon_configs → <slug> → backups`) and via Samba/SSH. Files older than `backup_retention_days` are deleted automatically.
 
-`/data/` is included in Home Assistant snapshots, so both the live database files AND the SQL dumps are captured.
+Both `/data/` (PostgreSQL data, repositories) AND `/config/` (backups + your overrides) are included in Home Assistant snapshots.
 
 ### Restore
 
 **Standard restore (from a HA snapshot):**
 
-1. Restore the snapshot in HA. The `/data/` content is brought back.
+1. Restore the snapshot in HA. The `/data/` and `/config/` content is brought back.
 2. Start the add-on. In most cases Postgres comes up cleanly and Forgejo starts.
 
 **Notfall restore from a `.sql.gz` dump (if Postgres files are corrupted):**
@@ -59,10 +59,46 @@ The add-on writes a `pg_dump` to `/data/backups/forgejo-YYYY-MM-DD_HH-MM.sql.gz`
 
    ```bash
    docker exec -i addon_forgejo \
-     bash -c 'gunzip -c /data/backups/forgejo-LATEST.sql.gz | su-exec postgres psql -h /tmp -U forgejo forgejo'
+     bash -c 'gunzip -c /config/backups/forgejo-LATEST.sql.gz | su-exec postgres psql -h /tmp -U forgejo forgejo'
    ```
 
 5. Start the add-on.
+
+## Customizing Forgejo Beyond the Add-on Options
+
+The add-on UI exposes a curated set of common Forgejo settings (`root_url`, `disable_registration`, etc.). Forgejo itself supports many more — anything from the [Forgejo cheat sheet](https://forgejo.org/docs/latest/admin/config-cheat-sheet/).
+
+To set any setting that the add-on UI doesn't expose, drop a file at:
+
+```
+/addon_configs/<addon-slug>/forgejo/app.ini.override
+```
+
+(Visible in the **File Editor** add-on or via Samba/SSH — under `addon_configs → <slug>`.)
+
+Its contents are appended to the auto-generated `app.ini` on every container start. Forgejo's INI parser is last-key-wins, so values in your override file take precedence over both the defaults and the HA-managed settings.
+
+### Example: force every new repository to be private
+
+Create the file with:
+
+```ini
+[repository]
+FORCE_PRIVATE = true
+DEFAULT_PRIVATE = private
+```
+
+Then restart the add-on. Every new repository is now created as private regardless of the user's choice.
+
+### Inspecting what HA generated
+
+The file `addon_configs/<slug>/forgejo/app.ini.generated` is updated on every start with the HA-options-driven config (without your override). Use it as a starting point to see what's already managed and what you might want to add to your override file.
+
+### What you CANNOT override
+
+- Database settings (`[database]`) — those are wired to the in-container PostgreSQL with a generated password.
+- The signing keys (`SECRET_KEY`, `INTERNAL_TOKEN`, `JWT_SECRET`, `LFS_JWT_SECRET`) — those are restored from the secrets cache on every restart and would re-generate sessions if changed.
+- `[server] HTTP_PORT` — Forgejo always listens on `3000` inside the container; map a different host port via the **Network** section in the add-on UI.
 
 ## SSH Push
 
@@ -97,10 +133,12 @@ When a new add-on version is published, HA shows an Update banner. Click Update 
 | Path | Content |
 |---|---|
 | `/data/postgres/` | PostgreSQL data files |
-| `/data/forgejo/conf/app.ini` | Generated Forgejo config (regenerated each start) |
+| `/data/forgejo/conf/app.ini` | Generated Forgejo config (regenerated each start; includes user override) |
 | `/data/forgejo/repos/` | Git repositories |
 | `/data/forgejo/lfs/` | Git LFS objects |
 | `/data/forgejo/attachments/` | Issue/PR attachments |
-| `/data/backups/` | `pg_dump` dumps |
 | `/data/.db_password` | Generated DB password (do not change manually) |
 | `/data/forgejo/conf/.secrets` | Cached SECRET_KEY/INTERNAL_TOKEN/JWT_SECRET (do not change manually) |
+| `/config/backups/` | `pg_dump` dumps (visible as `addon_configs/<slug>/backups/` in HA File Editor) |
+| `/config/forgejo/app.ini.override` | Optional user overlay appended to `app.ini` on every start |
+| `/config/forgejo/app.ini.generated` | Read-only snapshot of the HA-generated config (without override) |

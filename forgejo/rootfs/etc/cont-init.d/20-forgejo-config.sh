@@ -160,6 +160,28 @@ else
   chmod 600 "$SECRETS_CACHE"
 fi
 
+# Snapshot the HA-generated config (what HA-options produced) for user inspection.
+# This is NOT what Forgejo actually loads (the real app.ini also includes any
+# override appended below) — it's a reference of "what HA managed for you".
+mkdir -p /config/forgejo
+cp "$CONF_FILE" /config/forgejo/app.ini.generated
+chmod 0640 /config/forgejo/app.ini.generated
+
+# Apply user overlay: append /config/forgejo/app.ini.override (if any) to app.ini.
+# Forgejo's INI parser is last-key-wins, so user-supplied values override our generated ones.
+OVERRIDE_FILE=/config/forgejo/app.ini.override
+if [[ -f "$OVERRIDE_FILE" ]]; then
+  bashio::log.info "Applying user overlay from $OVERRIDE_FILE"
+  {
+    echo
+    echo "; ===== begin user override (from $OVERRIDE_FILE) ====="
+    cat "$OVERRIDE_FILE"
+    echo "; ===== end user override ====="
+  } >> "$CONF_FILE"
+else
+  bashio::log.info "No user overlay file at $OVERRIDE_FILE (skipping)"
+fi
+
 chown -R git:git /data/forgejo/conf
 chmod 0640 "$CONF_FILE"
 

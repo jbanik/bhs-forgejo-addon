@@ -58,8 +58,8 @@ else
   chown -R postgres:postgres "$PGDATA"
 fi
 
-# Always ensure /data/forgejo and /data/backups exist
-mkdir -p /data/forgejo /data/backups
+# Always ensure /data/forgejo and /config/backups exist
+mkdir -p /data/forgejo /config/backups
 chown -R git:git /data/forgejo
-chown postgres:postgres /data/backups
-chmod 0750 /data/backups
+chown postgres:postgres /config/backups
+chmod 0750 /config/backups

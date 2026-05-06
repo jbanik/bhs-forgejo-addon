@@ -8,26 +8,30 @@ IMAGE="${1:-bhs/forgejo-addon-test:amd64}"
 CONTAINER="forgejo-smoke"
 HTTP_PORT="${HTTP_PORT:-13000}"
 
-# DATA_DIR must be a path Docker Desktop can bind-mount AND that this shell
-# can read back. On Linux/macOS, the POSIX path works for both. On Windows
-# Git Bash / MSYS2, Docker Desktop needs a Windows-style path (C:/...) and
-# MSYS will rewrite Unix-looking arguments unless we disable it.
+# DATA_DIR / CONFIG_DIR must be paths Docker Desktop can bind-mount AND that
+# this shell can read back. On Linux/macOS, the POSIX path works for both. On
+# Windows Git Bash / MSYS2, Docker Desktop needs a Windows-style path (C:/...)
+# and MSYS will rewrite Unix-looking arguments unless we disable it.
 HOST_DATA_DIR="$(pwd)/test-data"
+HOST_CONFIG_DIR="$(pwd)/test-config"
 case "${OSTYPE:-}" in
   msys*|cygwin*)
     # Use Windows-style path so Docker Desktop's bind mount points to the
     # actual Windows directory the shell can also read from. Also disable
     # MSYS path conversion so "/data" stays "/data" inside docker args.
     HOST_DATA_DIR="$(pwd -W)/test-data"
+    HOST_CONFIG_DIR="$(pwd -W)/test-config"
     export MSYS_NO_PATHCONV=1
     ;;
 esac
 DATA_DIR="$HOST_DATA_DIR"
+CONFIG_DIR="$HOST_CONFIG_DIR"
 
 cleanup() {
   echo ">>> cleanup"
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   rm -rf "$DATA_DIR"
+  rm -rf "$CONFIG_DIR"
 }
 trap cleanup EXIT
 
@@ -57,6 +61,7 @@ wait_for_http() {
 }
 
 mkdir -p "$DATA_DIR"
+mkdir -p "$CONFIG_DIR"
 
 echo ">>> writing minimal /data/options.json (HA passes this to the add-on)"
 cat > "$DATA_DIR/options.json" <<'JSON'
@@ -75,6 +80,7 @@ echo ">>> starting container"
 docker run -d \
   --name "$CONTAINER" \
   -v "$DATA_DIR":/data \
+  -v "$CONFIG_DIR":/config \
   -p "$HTTP_PORT":3000 \
   "$IMAGE" >/dev/null
 
@@ -153,22 +159,32 @@ backup_count=0
 until [[ "$backup_count" -gt 0 ]]; do
   sleep 5
   elapsed=$((elapsed + 5))
-  backup_count=$(find "$DATA_DIR/backups" -name 'forgejo-*.sql.gz' 2>/dev/null | wc -l)
+  backup_count=$(find "$CONFIG_DIR/backups" -name 'forgejo-*.sql.gz' 2>/dev/null | wc -l)
   if [[ $elapsed -ge 90 ]]; then
     echo "  Timeout waiting for backup dump"
     docker logs "$CONTAINER" | tail -50
-    ls -la "$DATA_DIR/backups" || true
+    ls -la "$CONFIG_DIR/backups" || true
     exit 1
   fi
 done
 assert "at least one backup dump was created" test "$backup_count" -gt 0
 
 echo ">>> validating dump is a valid gzip + sql"
-DUMP_FILE=$(find "$DATA_DIR/backups" -name 'forgejo-*.sql.gz' | head -1)
+DUMP_FILE=$(find "$CONFIG_DIR/backups" -name 'forgejo-*.sql.gz' | head -1)
 assert "dump file is non-empty" test -s "$DUMP_FILE"
 assert "dump is valid gzip" gzip -t "$DUMP_FILE"
 assert "dump contains forgejo schema" \
   bash -c "gunzip -c '$DUMP_FILE' | head -20 | grep -q 'PostgreSQL database dump'"
+
+echo ">>> verifying app.ini.generated snapshot exists in /config"
+assert "app.ini.generated copy in /config" test -f "$CONFIG_DIR/forgejo/app.ini.generated"
+
+echo ">>> placing app.ini override before restart to verify pickup"
+mkdir -p "$CONFIG_DIR/forgejo"
+cat > "$CONFIG_DIR/forgejo/app.ini.override" <<'OVERRIDE'
+[repository]
+FORCE_PRIVATE = true
+OVERRIDE
 
 echo ">>> stopping and restarting container to verify data persistence"
 docker stop "$CONTAINER" >/dev/null
@@ -182,6 +198,8 @@ assert "Forgejo healthz responds 200 after restart" \
 assert "DB password file persisted" test -f "$DATA_DIR/.db_password"
 assert "Postgres data dir persisted" test -f "$DATA_DIR/postgres/PG_VERSION"
 assert "Forgejo secrets cache persisted" test -f "$DATA_DIR/forgejo/conf/.secrets"
+assert "override FORCE_PRIVATE applied after restart" \
+  bash -c "docker exec $CONTAINER grep -q '^FORCE_PRIVATE = true' /data/forgejo/conf/app.ini"
 
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"
