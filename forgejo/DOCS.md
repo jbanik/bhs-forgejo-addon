@@ -5,13 +5,13 @@
 1. **Install** the add-on from this repository.
 2. Open the **Configuration** tab and set:
    - `root_url` — the externally reachable URL, e.g. `https://git.example.com/`. Must end with a slash.
-   - `http_port` — host port to bind (default 3000). Pangolin connects here.
-3. **Start** the add-on. Watch the log for `Forgejo running on 0.0.0.0:3000`.
-4. Open `http://homeassistant.local:<http_port>` in your browser. The Forgejo Install page loads (one-time only). Walk through it — DB settings are pre-filled, you only need to create the **first admin user**.
+3. Open the **Network** section (also in the add-on settings) to set the host port that maps to Forgejo's container port `3000`. Default is `3000`.
+4. **Start** the add-on. Watch the log for `Forgejo running on 0.0.0.0:3000`.
+5. Open `http://homeassistant.local:<host-port>` in your browser, or click "OPEN WEB UI". The Forgejo Install page loads (one-time only). Walk through it — DB settings are pre-filled, you only need to create the **first admin user**.
 
 ## Reverse Proxy (Pangolin)
 
-Point your Pangolin route from your public hostname to `<homeassistant-ip>:<http_port>`. Forgejo trusts the `X-Forwarded-*` headers Pangolin sets.
+Point your Pangolin route from your public hostname to `<homeassistant-ip>:<host-port>`. Forgejo trusts the `X-Forwarded-*` headers Pangolin sets.
 
 If Forgejo links/redirects use the wrong scheme/host: re-check `root_url` and restart the add-on.
 
@@ -88,7 +88,7 @@ When a new add-on version is published, HA shows an Update banner. Click Update 
 | Problem | Check |
 |---|---|
 | Add-on stays "starting" forever | Logs — likely Postgres init failed. Check disk space and `/data/postgres` permissions. |
-| Forgejo `502` from Pangolin | Add-on running? `http_port` matches Pangolin upstream? |
+| Forgejo `502` from Pangolin | Add-on running? Host-port (Network section) matches Pangolin upstream? |
 | Wrong URL in emails / clone buttons | `root_url` setting; restart add-on after changing. |
 | No backups appearing | Logs of `crond`; verify `backup_cron` is a valid 5-field cron expression. |
 
