@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 - 2026-05-06
+
+- Add MIT LICENSE file at repo root.
+- README: add status badges (version, CI lint, license) and a "My Home Assistant" one-click button to add this repository to a HA instance.
+- GitHub repo metadata: description and topics set for discoverability.
+
 ## 0.3.1 - 2026-05-06
 
 - Security fix: redact PASSWD, SECRET_KEY, INTERNAL_TOKEN, JWT_SECRET and LFS_JWT_SECRET values in `/config/forgejo/app.ini.generated`. The snapshot is meant for inspection of HA-generated settings; secrets must not leak into the user-visible `/config/` tree (Samba shares, File Editor, off-site snapshots, etc.). Forgejo continues to use the real values from `/data/forgejo/conf/app.ini`, which is not user-visible.
