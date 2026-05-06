@@ -1,7 +1,8 @@
 name: Forgejo
-version: "0.1.2"
+version: "0.2.0"
 slug: forgejo
 description: Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled DB backups.
+webui: "http://[HOST]:[PORT:3000]"
 url: "https://github.com/jbanik/bhs-forgejo-addon"
 arch:
   - aarch64
@@ -21,7 +22,6 @@ ports_description:
 map:
   - addon_config:rw
 options:
-  http_port: 3000
   root_url: "https://git.banik-haustechnik-schwabach.de/"
   site_name: "Forgejo"
   disable_registration: true
@@ -30,7 +30,6 @@ options:
   backup_cron: "0 3 * * *"
   backup_retention_days: 7
 schema:
-  http_port: port
   root_url: url
   site_name: str
   disable_registration: bool

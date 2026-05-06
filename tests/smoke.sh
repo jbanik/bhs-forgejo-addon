@@ -61,7 +61,6 @@ mkdir -p "$DATA_DIR"
 echo ">>> writing minimal /data/options.json (HA passes this to the add-on)"
 cat > "$DATA_DIR/options.json" <<'JSON'
 {
-  "http_port": 13000,
   "root_url": "http://localhost:13000/",
   "site_name": "Forgejo Test",
   "disable_registration": true,

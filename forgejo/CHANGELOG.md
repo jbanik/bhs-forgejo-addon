@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 - 2026-05-06
+
+- Remove redundant `http_port` add-on option (Home Assistant's Network UI controls the host-side port; the option was never wired into Forgejo's app.ini).
+- Add `webui:` field so the add-on detail page shows an "OPEN WEB UI" button that opens Forgejo directly.
+- Documentation: how to add a Forgejo sidebar entry in Home Assistant via `panel_iframe` in `configuration.yaml`.
+
 ## 0.1.2 - 2026-05-06
 
 - Fix CI build for armv7: HA builder passes TARGETARCH=arm (not arm/v7), now matched in the Dockerfile case statement.

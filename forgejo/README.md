@@ -9,5 +9,6 @@ Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled database
 - All persistent data lives under `/data/`, included in Home Assistant snapshots.
 - HTTP only — TLS is the reverse proxy's job.
 - SSH push is disabled by default. Use HTTPS push with personal access tokens.
+- "OPEN WEB UI" button in the add-on opens Forgejo in a new tab.
 
 See `DOCS.md` for setup details.

@@ -24,7 +24,6 @@ get_option() {
   echo "$value"
 }
 
-HTTP_PORT=$(get_option 'http_port')
 ROOT_URL=$(get_option 'root_url')
 SITE_NAME=$(get_option 'site_name')
 DISABLE_REGISTRATION=$(get_option 'disable_registration')
@@ -52,7 +51,7 @@ DB_PASSWORD=$(cat "$PASSWORD_FILE")
 # Derive DOMAIN from ROOT_URL (strip scheme + path, keep host[:port])
 DOMAIN=$(echo "$ROOT_URL" | sed -E 's#^https?://##; s#/.*##; s#:.*##')
 
-bashio::log.info "Generating Forgejo config: ROOT_URL=$ROOT_URL, DOMAIN=$DOMAIN, HTTP_PORT=$HTTP_PORT"
+bashio::log.info "Generating Forgejo config: ROOT_URL=$ROOT_URL, DOMAIN=$DOMAIN"
 
 cat > "$CONF_FILE" <<EOF
 APP_NAME = $SITE_NAME

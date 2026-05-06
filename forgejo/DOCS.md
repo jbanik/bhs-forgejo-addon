@@ -15,6 +15,23 @@ Point your Pangolin route from your public hostname to `<homeassistant-ip>:<http
 
 If Forgejo links/redirects use the wrong scheme/host: re-check `root_url` and restart the add-on.
 
+## Sidebar Entry in Home Assistant
+
+The add-on shows an "OPEN WEB UI" button in its detail page automatically. To get a permanent **Sidebar entry** in Home Assistant that opens Forgejo, edit your `configuration.yaml` (the main HA config, not the add-on config):
+
+```yaml
+panel_iframe:
+  forgejo:
+    title: Forgejo
+    icon: mdi:git
+    url: https://git.example.com   # use your Pangolin URL or http://homeassistant.local:3000 for LAN-only
+    require_admin: false
+```
+
+Restart Home Assistant. A "Forgejo" item appears in the sidebar.
+
+**Note on cross-origin:** Modern browsers block iframes from setting cookies on cross-origin URLs (third-party cookie restrictions). If login fails inside the iframe, open Forgejo in a new tab via the "OPEN WEB UI" button or directly.
+
 ## Backups
 
 The add-on writes a `pg_dump` to `/data/backups/forgejo-YYYY-MM-DD_HH-MM.sql.gz` according to the `backup_cron` schedule. Files older than `backup_retention_days` are deleted automatically.

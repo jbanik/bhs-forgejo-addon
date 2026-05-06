@@ -1,7 +1,4 @@
 configuration:
-  http_port:
-    name: HTTP port
-    description: Host port mapped to Forgejo's internal port 3000.
   root_url:
     name: Root URL
     description: External URL Forgejo should advertise (e.g. https://git.example.com/). Must end with a slash.

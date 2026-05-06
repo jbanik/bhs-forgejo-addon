@@ -1,7 +1,4 @@
 configuration:
-  http_port:
-    name: HTTP-Port
-    description: Host-Port, der auf Forgejos internen Port 3000 gemappt wird.
   root_url:
     name: Root-URL
     description: Externe URL, die Forgejo angeben soll (z. B. https://git.example.com/). Muss mit Schrägstrich enden.
