@@ -178,6 +178,21 @@ assert "dump contains forgejo schema" \
 
 echo ">>> verifying app.ini.generated snapshot exists in /config"
 assert "app.ini.generated copy in /config" test -f "$CONFIG_DIR/forgejo/app.ini.generated"
+assert "snapshot does NOT contain real DB password" \
+  bash -c "! grep -E '^PASSWD = [a-zA-Z0-9]{16,}$' '$CONFIG_DIR/forgejo/app.ini.generated'"
+assert "snapshot DB password is redacted" \
+  grep -q '^PASSWD = <REDACTED>$' "$CONFIG_DIR/forgejo/app.ini.generated"
+assert "snapshot SECRET_KEY is redacted" \
+  grep -q '^SECRET_KEY = <REDACTED>$' "$CONFIG_DIR/forgejo/app.ini.generated"
+assert "snapshot INTERNAL_TOKEN is redacted" \
+  grep -q '^INTERNAL_TOKEN = <REDACTED>$' "$CONFIG_DIR/forgejo/app.ini.generated"
+assert "snapshot JWT_SECRET is redacted" \
+  grep -q '^JWT_SECRET = <REDACTED>$' "$CONFIG_DIR/forgejo/app.ini.generated"
+assert "snapshot LFS_JWT_SECRET is redacted" \
+  grep -q '^LFS_JWT_SECRET = <REDACTED>$' "$CONFIG_DIR/forgejo/app.ini.generated"
+echo ">>> verifying real app.ini in /data still has real secrets"
+assert "real app.ini has actual DB password" \
+  bash -c "docker exec $CONTAINER grep -E '^PASSWD = [a-zA-Z0-9]+$' /data/forgejo/conf/app.ini >/dev/null"
 
 echo ">>> placing app.ini override before restart to verify pickup"
 mkdir -p "$CONFIG_DIR/forgejo"

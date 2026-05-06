@@ -161,10 +161,15 @@ else
 fi
 
 # Snapshot the HA-generated config (what HA-options produced) for user inspection.
-# This is NOT what Forgejo actually loads (the real app.ini also includes any
-# override appended below) — it's a reference of "what HA managed for you".
+# /config/ is user-visible — redact every secret value before writing the snapshot.
 mkdir -p /config/forgejo
-cp "$CONF_FILE" /config/forgejo/app.ini.generated
+sed -E '
+  s|^(PASSWD = ).*|\1<REDACTED>|
+  s|^(SECRET_KEY = ).*|\1<REDACTED>|
+  s|^(INTERNAL_TOKEN = ).*|\1<REDACTED>|
+  s|^(JWT_SECRET = ).*|\1<REDACTED>|
+  s|^(LFS_JWT_SECRET = ).*|\1<REDACTED>|
+' "$CONF_FILE" > /config/forgejo/app.ini.generated
 chmod 0640 /config/forgejo/app.ini.generated
 
 # Apply user overlay: append /config/forgejo/app.ini.override (if any) to app.ini.
