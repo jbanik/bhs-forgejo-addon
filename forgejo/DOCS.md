@@ -104,17 +104,20 @@ The file `addon_configs/<slug>/forgejo/app.ini.generated` is updated on every st
 
 Optional. Off by default. To enable:
 
-1. In the add-on **Configuration** tab set `enable_ssh: true`. Optionally set `ssh_port` (default `3022`) — this is the port shown in clone URLs.
-2. **Restart** the add-on. The Forgejo log shows `SSH server: enabled (advertised port 3022, listen 3022, domain ...)`.
-3. Make the SSH port reachable. Two scenarios:
-   - **LAN-only:** Done. Forgejo listens on the host port mapped in the **Network** section (default `3022`). Clone URLs become `git@<haos-ip>:3022/user/repo.git`.
-   - **External (via reverse proxy):** Set up a TCP-stream forward from the public hostname to `<haos-ip>:<host-port>`. See the Pangolin instructions below for one example. Then set `ssh_port` to the externally accessible port (the front-port your reverse proxy listens on). Clone URLs become `git@<external-host>:<external-port>/user/repo.git`.
-4. In Forgejo: *Settings → SSH/GPG Keys → Add Key*. Paste your public key.
-5. Verify:
+1. **Complete the Forgejo install wizard first.** Forgejo's built-in SSH server only starts after the wizard is finished — open the Web UI and walk through it before enabling SSH, otherwise step 5 will hit `Connection refused` with no obvious cause.
+2. In the add-on **Configuration** tab set `enable_ssh: true`. Optionally set `ssh_port` (default `3022`) — this is the port shown in clone URLs.
+3. **Restart** the add-on. The Forgejo log shows a line starting with `SSH server: enabled` (it includes the advertised port, listen port `3022`, and the domain).
+4. Make the SSH port reachable. Two scenarios:
+   - **LAN-only:** Done. Forgejo listens on the host port mapped in the **Network** section (default `3022`). Clone URLs become `ssh://git@<haos-ip>:3022/user/repo.git`.
+   - **External (via reverse proxy):** Set up a TCP-stream forward from the public hostname to `<haos-ip>:<host-port>`. See the Pangolin instructions below for one example. Then set `ssh_port` to the externally accessible port (the front-port your reverse proxy listens on). Clone URLs become `ssh://git@<external-host>:<external-port>/user/repo.git`.
+5. In Forgejo: *Settings → SSH/GPG Keys → Add Key*. Paste your public key.
+6. Verify:
+
    ```bash
    ssh -p <ssh_port> -T git@<host>
    ```
-   Forgejo answers with `Hi there, jbanik! You've successfully authenticated, but Forgejo does not provide shell access.` That message means SSH+key auth works; you can now `git clone/push` over SSH.
+
+   Forgejo answers with `Hi there, <your-username>! You've successfully authenticated, but Forgejo does not provide shell access.` That message means SSH+key auth works; you can now `git clone/push` over SSH. If you see `Permission denied (publickey)`, re-check that the key was saved under the correct account in *Settings → SSH/GPG Keys*.
 
 ### HTTPS push (still works either way)
 
@@ -134,8 +137,8 @@ Pangolin handles HTTP routing for the Web-UI, but SSH needs a separate **Raw TCP
 2. **Resource Type:** *Raw TCP* (NOT HTTP — that's for the Web-UI route, which already exists)
 3. **External Hostname:** the public hostname you want SSH on (typically the same as your Forgejo Web-UI hostname, e.g. `git.example.com`)
 4. **External Port:** pick one. Common choices:
-   - `22` — matches the SSH default; clone URLs hide the port (`git@git.example.com/...`). Only works if Pangolin's host has port 22 free.
-   - `3022` — same number as inside; clone URLs show `:3022`. Free of conflicts.
+   - `22` — matches the SSH default; clone URLs use the standard form `git@git.example.com:user/repo.git` (no port needed when 22). Only works if Pangolin's host has port 22 free.
+   - `3022` — same number as inside; clone URLs show `ssh://git@git.example.com:3022/user/repo.git`. Free of conflicts.
 5. **Target:** the LAN IP/hostname of your HAOS host (e.g. `192.168.1.10`)
 6. **Target Port:** the host-side port from HA's Network section (default `3022`)
 7. **Authentication:** *None* (Forgejo's SSH does its own public-key auth)
@@ -147,17 +150,9 @@ Pangolin handles HTTP routing for the Web-UI, but SSH needs a separate **Raw TCP
 
 After Pangolin is set up, set the add-on's `ssh_port` option to whatever **External Port** you picked (so Forgejo's clone URLs match). Restart the add-on.
 
-### Generic reverse proxy (Caddy, Nginx, NPM, …)
+### Generic reverse proxy (Nginx, Caddy, …)
 
-Same idea. Caddy example: in `Caddyfile` add a stream block (requires the L4 plugin):
-
-```
-:3022 {
-    reverse_proxy <haos-ip>:3022
-}
-```
-
-Or with Nginx's `stream` module:
+Same idea: forward TCP without TLS termination. Nginx's `stream` module example:
 
 ```nginx
 stream {
@@ -168,9 +163,11 @@ stream {
 }
 ```
 
+For **Caddy**, install the [caddy-l4](https://github.com/mholt/caddy-l4) plugin and configure a `layer4` block — see the plugin's README for current syntax.
+
 ### Other reverse proxy (NPM, plain TCP forwarder, etc.)
 
-Anything that does plain TCP-stream forwarding works — SSH does not need any HTTP layer.
+Anything that does plain TCP-stream forwarding works — SSH does not need any HTTP layer. For Nginx Proxy Manager, use a **Stream** entry rather than a Proxy Host.
 
 ## Updating
 
