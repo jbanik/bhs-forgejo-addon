@@ -5,7 +5,7 @@
 1. **Install** the add-on from this repository.
 2. Open the **Configuration** tab and set:
    - `root_url` — the externally reachable URL, e.g. `https://git.example.com/`. Must end with a slash.
-3. Open the **Network** section (also in the add-on settings) to set the host port that maps to Forgejo's container port `3000`. Default is `3000`.
+3. Open the **Network** section (also in the add-on settings) to set the host port that maps to Forgejo's container port `3000`. Default is `3080` (changed from `3000` in v0.4.0 — see "Migrating from v0.3.x" below if upgrading).
 4. **Start** the add-on. Watch the log for `Forgejo running on 0.0.0.0:3000`.
 5. Open `http://homeassistant.local:<host-port>` in your browser, or click "OPEN WEB UI". The Forgejo Install page loads (one-time only). Walk through it — DB settings are pre-filled, you only need to create the **first admin user**.
 

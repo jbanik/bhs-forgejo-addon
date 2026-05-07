@@ -7,7 +7,7 @@
 - **Default HTTP host port mapping changes from `3000` to `3080`.** This is a HA Network-section default; users who rely on `3000` (e.g. with a reverse proxy route hardcoded to `<haos>:3000`) will lose external connectivity unless they either:
   1. Update their reverse proxy upstream to `<haos>:3080`, or
   2. Manually set the host port back to `3000` in the add-on's **Network** section after updating.
-- See `DOCS.md` → "Migrating from v0.3.x" for step-by-step.
+- See [DOCS.md — Migrating from v0.3.x](DOCS.md#migrating-from-v03x) for step-by-step.
 
 ### Added
 
