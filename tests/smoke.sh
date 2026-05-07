@@ -108,7 +108,7 @@ complete_forgejo_install() {
     --data-urlencode "lfs_root_path=/data/forgejo/lfs" \
     --data-urlencode "run_user=git" \
     --data-urlencode "domain=localhost" \
-    --data-urlencode "ssh_port=${SSH_PORT_HOST}" \
+    --data-urlencode "ssh_port=3022" \
     --data-urlencode "http_port=3000" \
     --data-urlencode "app_url=http://localhost:${http_port}/" \
     --data-urlencode "log_root_path=/data/forgejo/log" \
@@ -121,14 +121,15 @@ complete_forgejo_install() {
 
   if echo "$response" | grep -q 'gitea_incredible'; then
     echo "  Install form accepted (session cookie set)"
-  elif echo "$response" | grep -qE '(already installed|Installation)'; then
-    echo "  Forgejo already installed or showing install page — assuming DB was pre-populated"
+  elif echo "$response" | grep -q 'already installed'; then
+    echo "  Forgejo already installed — OK"
   else
-    # Dump the flash error if any
+    # Either install POST failed (re-rendered install page) or unknown response.
+    # Don't claim success — let the downstream wait_for_http catch it loudly.
     local flash
     flash=$(echo "$response" | grep -A2 'flash-error' | grep '<p>' | sed 's|.*<p>||;s|</p>.*||' || true)
-    echo "  Install form response: ${flash:-unknown response}"
-    echo "  Continuing — Forgejo may self-detect the existing DB"
+    echo "  WARNING: Install form POST may have failed. Flash error: ${flash:-none extracted}"
+    echo "  Continuing — downstream healthz wait will catch any real failure"
   fi
 }
 

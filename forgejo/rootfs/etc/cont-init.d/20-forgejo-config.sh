@@ -153,6 +153,9 @@ fi
 
 # Substitute the placeholder. Use a temp file to avoid sed-on-multiline-replacement
 # pain — write a fresh app.ini through awk.
+# NOTE: awk -v interprets \n/\t/\\ in the assigned value. Safe here because DOMAIN
+# is backslash-stripped by sanitize_ini and SSH_PORT is an integer (HA schema enforces).
+# If new SSH_* fields with backslash-containing values are added, switch to file-based input.
 awk -v block="$SSH_BLOCK" '
   /^__SSH_BLOCK__$/ { print block; next }
   { print }
