@@ -39,7 +39,7 @@ panel_iframe:
   forgejo:
     title: Forgejo
     icon: mdi:git
-    url: https://git.example.com   # use your Pangolin URL or http://homeassistant.local:3000 for LAN-only
+    url: https://git.example.com   # use your Pangolin URL or http://homeassistant.local:3080 for LAN-only (3000 in v0.3.x)
     require_admin: false
 ```
 
