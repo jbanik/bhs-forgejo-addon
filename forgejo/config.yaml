@@ -1,5 +1,5 @@
 name: Forgejo
-version: "0.4.0"
+version: "0.4.0-rc1"
 slug: forgejo
 description: Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled DB backups.
 webui: "http://[HOST]:[PORT:3000]"
