@@ -29,6 +29,8 @@ SITE_NAME=$(get_option 'site_name')
 DISABLE_REGISTRATION=$(get_option 'disable_registration')
 REQUIRE_SIGNIN_VIEW=$(get_option 'require_signin_view')
 LOG_LEVEL=$(get_option 'log_level')
+ENABLE_SSH=$(get_option enable_ssh)
+SSH_PORT=$(get_option ssh_port)
 
 # Strip characters that would break INI syntax or trigger heredoc interpretation:
 # - newlines/CR break line structure
@@ -45,6 +47,10 @@ sanitize_ini() { tr -d '\n\r`' <<< "$1" | tr -d '\\'; }
 SITE_NAME=$(sanitize_ini "$SITE_NAME")
 ROOT_URL=$(sanitize_ini "$ROOT_URL")
 LOG_LEVEL=$(sanitize_ini "$LOG_LEVEL")
+case "$ENABLE_SSH" in
+  true|True|TRUE|1|yes) ENABLE_SSH=true ;;
+  *) ENABLE_SSH=false ;;
+esac
 
 DB_PASSWORD=$(cat "$PASSWORD_FILE")
 
@@ -65,8 +71,7 @@ HTTP_ADDR = 0.0.0.0
 HTTP_PORT = 3000
 DOMAIN = $DOMAIN
 ROOT_URL = $ROOT_URL
-DISABLE_SSH = true
-START_SSH_SERVER = false
+__SSH_BLOCK__
 LFS_START_SERVER = true
 LFS_JWT_SECRET = $(head -c 32 /dev/urandom | base64 | tr -d '+/=\n' | head -c 43)
 APP_DATA_PATH = /data/forgejo
@@ -131,6 +136,27 @@ ENABLED = false
 SHOW_FOOTER_VERSION = false
 SHOW_FOOTER_TEMPLATE_LOAD_TIME = false
 EOF
+
+# Build the SSH block based on enable_ssh option, then substitute into app.ini.
+if [[ "$ENABLE_SSH" == "true" ]]; then
+  bashio::log.info "SSH server: enabled (advertised port $SSH_PORT, listen 3022, domain $DOMAIN)"
+  SSH_BLOCK="DISABLE_SSH = false
+START_SSH_SERVER = true
+SSH_LISTEN_PORT = 3022
+SSH_PORT = $SSH_PORT
+SSH_DOMAIN = $DOMAIN"
+else
+  bashio::log.info "SSH server: disabled"
+  SSH_BLOCK="DISABLE_SSH = true
+START_SSH_SERVER = false"
+fi
+
+# Substitute the placeholder. Use a temp file to avoid sed-on-multiline-replacement
+# pain — write a fresh app.ini through awk.
+awk -v block="$SSH_BLOCK" '
+  /^__SSH_BLOCK__$/ { print block; next }
+  { print }
+' "$CONF_FILE" > "$CONF_FILE.tmp" && mv "$CONF_FILE.tmp" "$CONF_FILE"
 
 # IMPORTANT: regenerating SECRET_KEY/INTERNAL_TOKEN/JWT_SECRET on every start would
 # invalidate sessions and 2FA tokens. So: only generate on first run, then stash a copy.
