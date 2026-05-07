@@ -9,6 +9,21 @@
 4. **Start** the add-on. Watch the log for `Forgejo running on 0.0.0.0:3000`.
 5. Open `http://homeassistant.local:<host-port>` in your browser, or click "OPEN WEB UI". The Forgejo Install page loads (one-time only). Walk through it — DB settings are pre-filled, you only need to create the **first admin user**.
 
+## Migrating from v0.3.x
+
+v0.4.0 changes the **default HTTP host port from 3000 to 3080**. This affects you only if:
+
+- You let HA pick the host port (i.e. you never manually set it in the **Network** section), AND
+- You have a reverse proxy or bookmark pointing at `<haos>:3000`.
+
+Two mitigation paths after the update:
+
+**Option 1 — keep using port 3000:** Open the add-on's **Network** tab, set the host port for `3000/tcp` back to `3000`. Save + restart. Reverse proxy keeps working unchanged.
+
+**Option 2 — switch to 3080:** Update your reverse proxy upstream to `<haos>:3080`. The add-on serves on the new default.
+
+If you've always set the port manually, your value is preserved through the update and nothing breaks.
+
 ## Reverse Proxy (Pangolin)
 
 Point your Pangolin route from your public hostname to `<homeassistant-ip>:<host-port>`. Forgejo trusts the `X-Forwarded-*` headers Pangolin sets.
