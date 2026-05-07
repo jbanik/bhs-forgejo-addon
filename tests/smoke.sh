@@ -7,6 +7,7 @@ set -euo pipefail
 IMAGE="${1:-bhs/forgejo-addon-test:amd64}"
 CONTAINER="forgejo-smoke"
 HTTP_PORT="${HTTP_PORT:-13000}"
+SSH_PORT_HOST="${SSH_PORT_HOST:-13022}"
 
 # DATA_DIR / CONFIG_DIR must be paths Docker Desktop can bind-mount AND that
 # this shell can read back. On Linux/macOS, the POSIX path works for both. On
@@ -60,6 +61,78 @@ wait_for_http() {
   done
 }
 
+ssh_banner_ok() {
+  local port="$1"
+  python -c "
+import socket
+s = socket.socket()
+s.settimeout(3)
+try:
+    s.connect(('localhost', $port))
+    banner = s.recv(50).decode(errors='replace')
+    s.close()
+    exit(0 if banner.startswith('SSH-2.0-') else 1)
+except Exception:
+    exit(1)
+" 2>/dev/null
+}
+
+# Complete the Forgejo first-boot install wizard via its web form.
+# On first run the DB is empty → Forgejo runs in install mode and its built-in
+# SSH server does NOT start until installation is complete.  Once the form is
+# POSTed successfully, Forgejo reloads in installed mode and SSH comes up.
+# We detect success by the presence of the "gitea_incredible" session cookie in
+# the response (Forgejo sets it only after a successful install form POST).
+# Idempotent: if Forgejo is already installed the form POST returns 200 with a
+# redirect-to-root body or a "already installed" message; we treat that as OK.
+complete_forgejo_install() {
+  local http_port="$1"
+  local db_password_file="$2"
+  local db_password
+  db_password=$(cat "$db_password_file")
+
+  echo "  POSTing Forgejo install form (db_password from $db_password_file)..."
+  local response
+  response=$(MSYS_NO_PATHCONV=1 curl -s -X POST "http://localhost:${http_port}/" \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode "db_type=postgres" \
+    --data-urlencode "db_host=127.0.0.1:5432" \
+    --data-urlencode "db_user=forgejo" \
+    --data-urlencode "db_passwd=${db_password}" \
+    --data-urlencode "db_name=forgejo" \
+    --data-urlencode "ssl_mode=disable" \
+    --data-urlencode "db_schema=" \
+    --data-urlencode "app_name=Forgejo Test" \
+    --data-urlencode "app_slogan=Smoke test instance" \
+    --data-urlencode "repo_root_path=/data/forgejo/repos" \
+    --data-urlencode "lfs_root_path=/data/forgejo/lfs" \
+    --data-urlencode "run_user=git" \
+    --data-urlencode "domain=localhost" \
+    --data-urlencode "ssh_port=3022" \
+    --data-urlencode "http_port=3000" \
+    --data-urlencode "app_url=http://localhost:${http_port}/" \
+    --data-urlencode "log_root_path=/data/forgejo/log" \
+    --data-urlencode "disable_registration=on" \
+    --data-urlencode "admin_name=smoketestadmin" \
+    --data-urlencode "admin_email=smoketest@localhost.local" \
+    --data-urlencode "admin_passwd=Smoke1234!" \
+    --data-urlencode "admin_confirm_passwd=Smoke1234!" \
+    -D - 2>/dev/null)
+
+  if echo "$response" | grep -q 'gitea_incredible'; then
+    echo "  Install form accepted (session cookie set)"
+  elif echo "$response" | grep -q 'already installed'; then
+    echo "  Forgejo already installed — OK"
+  else
+    # Either install POST failed (re-rendered install page) or unknown response.
+    # Don't claim success — let the downstream wait_for_http catch it loudly.
+    local flash
+    flash=$(echo "$response" | grep -A2 'flash-error' | grep '<p>' | sed 's|.*<p>||;s|</p>.*||' || true)
+    echo "  WARNING: Install form POST may have failed. Flash error: ${flash:-none extracted}"
+    echo "  Continuing — downstream healthz wait will catch any real failure"
+  fi
+}
+
 mkdir -p "$DATA_DIR"
 mkdir -p "$CONFIG_DIR"
 
@@ -72,7 +145,9 @@ cat > "$DATA_DIR/options.json" <<'JSON'
   "require_signin_view": false,
   "log_level": "Info",
   "backup_cron": "*/1 * * * *",
-  "backup_retention_days": 1
+  "backup_retention_days": 1,
+  "enable_ssh": true,
+  "ssh_port": 3022
 }
 JSON
 
@@ -82,6 +157,7 @@ docker run -d \
   -v "$DATA_DIR":/data \
   -v "$CONFIG_DIR":/config \
   -p "$HTTP_PORT":3000 \
+  -p "$SSH_PORT_HOST":3022 \
   "$IMAGE" >/dev/null
 
 echo ">>> waiting up to 60s for container to be running"
@@ -145,6 +221,18 @@ assert "app.ini sets DISABLE_REGISTRATION = true" \
 assert "app.ini starts with INSTALL_LOCK = false (first boot)" \
   grep -q "^INSTALL_LOCK = false" "$DATA_DIR/forgejo/conf/app.ini"
 
+echo ">>> verifying SSH-enabled config (default test options)"
+assert "app.ini has START_SSH_SERVER = true" \
+  grep -q '^START_SSH_SERVER = true' "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini has DISABLE_SSH = false" \
+  grep -q '^DISABLE_SSH = false' "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini has SSH_LISTEN_PORT = 3022" \
+  grep -q '^SSH_LISTEN_PORT = 3022' "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini has SSH_PORT = 3022" \
+  grep -q '^SSH_PORT = 3022' "$DATA_DIR/forgejo/conf/app.ini"
+assert "app.ini has SSH_DOMAIN = localhost" \
+  grep -q '^SSH_DOMAIN = localhost' "$DATA_DIR/forgejo/conf/app.ini"
+
 echo ">>> waiting up to 90s for Forgejo HTTP healthz"
 wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 90
 # shellcheck disable=SC2086
@@ -152,6 +240,28 @@ assert "Forgejo /api/healthz responds 200" \
   bash -c "[[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT/api/healthz)\" == \"200\" ]]"
 assert "Forgejo HTML home page reachable" \
   bash -c "curl -fsS http://localhost:$HTTP_PORT/ | grep -q 'Forgejo'"
+
+echo ">>> completing Forgejo first-boot install (required before SSH server starts)"
+# Forgejo's built-in SSH server only starts after installation is complete.
+# On first boot with an empty DB, Forgejo runs in install mode; we POST the
+# install form so it transitions to installed mode and starts the SSH server.
+complete_forgejo_install "$HTTP_PORT" "$DATA_DIR/.db_password"
+
+echo ">>> waiting up to 60s for Forgejo to transition to installed mode (healthz)"
+wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 60
+
+echo ">>> waiting up to 30s for SSH port to accept connections"
+elapsed=0
+until ssh_banner_ok "$SSH_PORT_HOST"; do
+  sleep 2
+  elapsed=$((elapsed + 2))
+  if [[ $elapsed -ge 30 ]]; then
+    echo "  Timeout waiting for SSH banner on localhost:$SSH_PORT_HOST"
+    docker logs "$CONTAINER" | tail -50
+    exit 1
+  fi
+done
+assert "SSH port responds with SSH-2.0 banner" ssh_banner_ok "$SSH_PORT_HOST"
 
 echo ">>> waiting up to 90s for first backup dump (cron is */1 in test config)"
 elapsed=0
@@ -215,6 +325,38 @@ assert "Postgres data dir persisted" test -f "$DATA_DIR/postgres/PG_VERSION"
 assert "Forgejo secrets cache persisted" test -f "$DATA_DIR/forgejo/conf/.secrets"
 assert "override FORCE_PRIVATE applied after restart" \
   bash -c "docker exec $CONTAINER grep -q '^FORCE_PRIVATE = true' /data/forgejo/conf/app.ini"
+
+echo ">>> toggling SSH off and verifying disable path"
+docker stop "$CONTAINER" >/dev/null
+
+cat > "$DATA_DIR/options.json" <<'JSON'
+{
+  "root_url": "http://localhost:13000/",
+  "site_name": "Forgejo Test",
+  "disable_registration": true,
+  "require_signin_view": false,
+  "log_level": "Info",
+  "backup_cron": "*/1 * * * *",
+  "backup_retention_days": 1,
+  "enable_ssh": false,
+  "ssh_port": 3022
+}
+JSON
+
+docker start "$CONTAINER" >/dev/null
+echo ">>> waiting up to 60s for Forgejo to come back up after SSH-disable toggle"
+wait_for_http "http://localhost:$HTTP_PORT/api/healthz" 60
+
+assert "app.ini has DISABLE_SSH = true after toggle" \
+  bash -c "docker exec $CONTAINER grep -q '^DISABLE_SSH = true' /data/forgejo/conf/app.ini"
+assert "app.ini has START_SSH_SERVER = false after toggle" \
+  bash -c "docker exec $CONTAINER grep -q '^START_SSH_SERVER = false' /data/forgejo/conf/app.ini"
+echo ">>> verifying SSH port refuses connection when disabled"
+if ssh_banner_ok "$SSH_PORT_HOST"; then
+  echo "  FAIL: SSH port should NOT respond with banner when enable_ssh=false"
+  exit 1
+fi
+echo "  PASS: SSH port refuses connection when disabled"
 
 echo ">>> SMOKE: postgres assertions passed"
 echo "ALL ASSERTIONS PASSED"

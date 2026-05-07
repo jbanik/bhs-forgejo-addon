@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0-rc1 - 2026-05-07
+
+### ⚠️ Breaking
+
+- **Default HTTP host port mapping changes from `3000` to `3080`.** This is a HA Network-section default; users who rely on `3000` (e.g. with a reverse proxy route hardcoded to `<haos>:3000`) will lose external connectivity unless they either:
+  1. Update their reverse proxy upstream to `<haos>:3080`, or
+  2. Manually set the host port back to `3000` in the add-on's **Network** section after updating.
+- See [DOCS.md — Migrating from v0.3.x](DOCS.md#migrating-from-v03x) for step-by-step.
+
+### Added
+
+- **Optional SSH push.** New options `enable_ssh` (default `false`) and `ssh_port` (default `3022`). When enabled, Forgejo's built-in SSH server runs alongside HTTP — no separate daemon, no extra container service.
+- New container port `3022/tcp` exposed for SSH (only used when `enable_ssh: true`).
+- DOCS.md: full SSH setup section including Pangolin TCP-stream forwarding steps.
+
 ## 0.3.2 - 2026-05-06
 
 - Add MIT LICENSE file at repo root.

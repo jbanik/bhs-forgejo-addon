@@ -1,5 +1,5 @@
 name: Forgejo
-version: "0.3.2"
+version: "0.4.0-rc1"
 slug: forgejo
 description: Self-hosted Forgejo Git server with bundled PostgreSQL 16 and scheduled DB backups.
 webui: "http://[HOST]:[PORT:3000]"
@@ -16,9 +16,11 @@ hassio_api: false
 hassio_role: default
 homeassistant_api: false
 ports:
-  3000/tcp: 3000
+  3000/tcp: 3080
+  3022/tcp: 3022
 ports_description:
   3000/tcp: Forgejo HTTP
+  3022/tcp: Forgejo SSH (only used when enable_ssh option is true)
 map:
   - addon_config:rw
 options:
@@ -29,6 +31,8 @@ options:
   log_level: "Info"
   backup_cron: "0 3 * * *"
   backup_retention_days: 7
+  enable_ssh: false
+  ssh_port: 3022
 schema:
   root_url: url
   site_name: str
@@ -37,4 +41,6 @@ schema:
   log_level: list(Trace|Debug|Info|Warn|Error|Critical|Fatal)
   backup_cron: "match(^([0-9*,/-]+\\s+){4}[0-9*,/-]+$)"
   backup_retention_days: int(1,365)
+  enable_ssh: bool
+  ssh_port: port
 image: "ghcr.io/jbanik/{arch}-addon-forgejo"

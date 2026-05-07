@@ -20,3 +20,9 @@ configuration:
   backup_retention_days:
     name: Backup-Aufbewahrung (Tage)
     description: Wie viele Tage .sql.gz-Dumps in /data/backups aufbewahrt werden.
+  enable_ssh:
+    name: SSH-Server aktivieren
+    description: Aktiviert Forgejos eingebauten SSH-Server für git push/clone via SSH. Standard aus.
+  ssh_port:
+    name: SSH-Port (in Clone-URLs)
+    description: Port der in Clone-URLs erscheint (z. B. git@host:3022/user/repo.git). Muss dem extern erreichbaren Port entsprechen — Host-Port direkt (LAN) oder dem Pangolin/Reverse-Proxy-Front-Port (extern). Container-interner Port ist fest 3022.
